@@ -8875,6 +8875,16 @@ SDValue RISCVTargetLowering::lowerVectorMaskExt(SDValue Op, SelectionDAG &DAG,
   MVT I1ContainerVT =
       MVT::getVectorVT(MVT::i1, ContainerVT.getVectorElementCount());
 
+  bool negated = false;
+  if (Src.getOpcode() == ISD::EXTRACT_SUBVECTOR &&
+      Src.getOperand(0).getOpcode() ==
+          RISCVISD::VMXOR_VL) { // TODO: check xor 1
+    negated = true;
+    Src = DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, Src.getValueType(),
+                      Src.getOperand(0).getOperand(0),
+                      DAG.getVectorIdxConstant(0, DL));
+  }
+
   SDValue CC = convertToScalableVector(I1ContainerVT, Src, DAG, Subtarget);
 
   SDValue VL = getDefaultVLOps(VecVT, ContainerVT, DL, DAG, Subtarget).second;
@@ -8882,6 +8892,8 @@ SDValue RISCVTargetLowering::lowerVectorMaskExt(SDValue Op, SelectionDAG &DAG,
   MVT XLenVT = Subtarget.getXLenVT();
   SDValue SplatZero = DAG.getConstant(0, DL, XLenVT);
   SDValue SplatTrueVal = DAG.getSignedConstant(ExtTrueVal, DL, XLenVT);
+  if (negated)
+    std::swap(SplatZero, SplatTrueVal);
 
   SplatZero = DAG.getNode(RISCVISD::VMV_V_X_VL, DL, ContainerVT,
                           DAG.getUNDEF(ContainerVT), SplatZero, VL);
